@@ -32,6 +32,7 @@ type Config struct {
 	Tags        map[string]string `mapstructure:"tags"`
 	Name        string            `mapstructure:"ami_name"`
 	Description string            `mapstructure:"ami_description"`
+	LicenseType string            `mapstructure:"license_type"`
 	Users       []string          `mapstructure:"ami_users"`
 	Groups      []string          `mapstructure:"ami_groups"`
 
@@ -61,6 +62,10 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 	// Set defaults
 	if p.config.S3Key == "" {
 		p.config.S3Key = "packer-import-{{timestamp}}.ova"
+	}
+
+	if p.config.LicenseType == "" {
+		p.config.LicenseType = "BYOL"
 	}
 
 	errs := new(packer.MultiError)
@@ -158,10 +163,11 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Completed upload of %s to s3://%s/%s", source, p.config.S3Bucket, p.config.S3Key))
 
 	// Call EC2 image import process
-	log.Printf("Calling EC2 to import from s3://%s/%s", p.config.S3Bucket, p.config.S3Key)
+	log.Printf("Calling EC2 to import from s3://%s/%s with license type %s", p.config.S3Bucket, p.config.S3Key, p.config.LicenseType)
 
 	ec2conn := ec2.New(session)
 	import_start, err := ec2conn.ImportImage(&ec2.ImportImageInput{
+		LicenseType: &p.config.LicenseType,
 		DiskContainers: []*ec2.ImageDiskContainer{
 			{
 				UserBucket: &ec2.UserBucket{
